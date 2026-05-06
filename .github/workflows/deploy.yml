@@ -25,7 +25,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/websocket-server:latest
+          tags: ghcr.io/lynx-stock-exchange/websocket-server:latest
 
   deploy:
     runs-on: ubuntu-latest
