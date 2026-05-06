@@ -265,7 +265,7 @@ Set the `KAFKA_BROKERS` environment variable in your service to point at the sha
 
 ---
 
-### Topic: `price-updates`
+### Topic: `stock.prices`
 
 Published by: price feed engine
 
@@ -284,7 +284,7 @@ Delivered to: all clients subscribed to `PRICE_FEED` for that ticker.
 
 ---
 
-### Topic: `order-updates`
+### Topic: `orders.updates`
 
 Published by: matching engine
 
@@ -304,7 +304,7 @@ Published by: matching engine
 
 ---
 
-### Topic: `order-book-updates`
+### Topic: `orders.volumes`
 
 Published by: matching engine / book aggregator
 
@@ -326,7 +326,7 @@ Delivered to: all clients subscribed to `ORDER_BOOK` for that ticker.
 
 ---
 
-### Topic: `market-events`
+### Topic: `market.events`
 
 Published by: news feed / risk engine
 

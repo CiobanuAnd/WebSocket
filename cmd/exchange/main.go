@@ -106,10 +106,11 @@ func main() {
 	go func() {
 		log.Printf("Starting WebSocket server on ws://localhost:8080/ws\n\n")
 		log.Printf("Kafka topics:\n")
-		log.Printf("  price-updates\n")
-		log.Printf("  order-updates\n")
-		log.Printf("  order-book-updates\n")
-		log.Printf("  market-events\n\n")
+		log.Printf("  stock.prices\n")
+		log.Printf("  orders.updates\n")
+		log.Printf("  orders.volumes\n")
+		log.Printf("  market.events\n")
+		log.Printf("  market.ticks\n\n")
 		log.Printf("Test credentials: api_key=test-api-key, api_secret=test-api-secret\n\n")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v\n", err)

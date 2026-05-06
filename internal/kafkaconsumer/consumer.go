@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	TopicPriceUpdates     = "price-updates"
-	TopicOrderUpdates     = "order-updates"
-	TopicOrderBookUpdates = "order-book-updates"
-	TopicMarketEvents     = "market-events"
+	TopicPriceUpdates     = "stock.prices"
+	TopicOrderUpdates     = "orders.updates"
+	TopicOrderBookUpdates = "orders.volumes"
+	TopicMarketEvents     = "market.events"
+	TopicMarketTicks      = "market.ticks"
 	consumerGroup         = "websocket-server"
 )
 
@@ -63,7 +64,7 @@ func (c *Consumer) consume(ctx context.Context, topic string, handler func([]byt
 	}
 }
 
-// OrderUpdateMessage is the canonical wire format for the order-updates topic.
+// OrderUpdateMessage is the canonical wire format for the orders.updates topic.
 // platform_id is embedded in the message body (not the Kafka key) so a single
 // consumer can route updates to the correct platform without key inspection.
 type OrderUpdateMessage struct {
@@ -79,12 +80,12 @@ type OrderUpdateMessage struct {
 func (c *Consumer) handlePriceUpdate(data []byte) {
 	var payload ws.PriceUpdatePayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		log.Printf("price-updates: invalid message: %v", err)
+		log.Printf("stock.prices: invalid message: %v", err)
 		return
 	}
 	payload.Ticker = strings.ToUpper(strings.TrimSpace(payload.Ticker))
 	if payload.Ticker == "" {
-		log.Println("price-updates: missing ticker, skipping")
+		log.Println("stock.prices: missing ticker, skipping")
 		return
 	}
 	c.hub.PublishPriceUpdate(payload)
@@ -93,12 +94,12 @@ func (c *Consumer) handlePriceUpdate(data []byte) {
 func (c *Consumer) handleOrderUpdate(data []byte) {
 	var msg OrderUpdateMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
-		log.Printf("order-updates: invalid message: %v", err)
+		log.Printf("orders.updates: invalid message: %v", err)
 		return
 	}
 	msg.PlatformID = strings.TrimSpace(msg.PlatformID)
 	if msg.PlatformID == "" {
-		log.Println("order-updates: missing platform_id, skipping")
+		log.Println("orders.updates: missing platform_id, skipping")
 		return
 	}
 	c.hub.PublishOrderUpdate(msg.PlatformID, ws.OrderUpdatePayload{
@@ -114,12 +115,12 @@ func (c *Consumer) handleOrderUpdate(data []byte) {
 func (c *Consumer) handleOrderBookUpdate(data []byte) {
 	var payload ws.OrderBookUpdatePayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		log.Printf("order-book-updates: invalid message: %v", err)
+		log.Printf("orders.volumes: invalid message: %v", err)
 		return
 	}
 	payload.Ticker = strings.ToUpper(strings.TrimSpace(payload.Ticker))
 	if payload.Ticker == "" {
-		log.Println("order-book-updates: missing ticker, skipping")
+		log.Println("orders.volumes: missing ticker, skipping")
 		return
 	}
 	c.hub.PublishOrderBookUpdate(payload)
@@ -128,7 +129,7 @@ func (c *Consumer) handleOrderBookUpdate(data []byte) {
 func (c *Consumer) handleMarketEvent(data []byte) {
 	var payload ws.MarketEventPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		log.Printf("market-events: invalid message: %v", err)
+		log.Printf("market.events: invalid message: %v", err)
 		return
 	}
 	c.hub.PublishMarketEvent(payload)
