@@ -1,4 +1,4 @@
-package platformauth
+package auth
 
 import (
 	"context"
@@ -29,15 +29,14 @@ func TestAuthenticatePlatformCallsVerifyEndpoint(t *testing.T) {
 		}
 
 		_ = json.NewEncoder(w).Encode(verifyResponse{
-			Valid:        true,
-			PlatformID:   "platform-1",
-			PlatformName: "Broker One",
+			Valid:      true,
+			PlatformID: "platform-1",
 		})
 	}))
 	defer server.Close()
 
-	client := New(Config{BaseURL: server.URL})
-	platform, err := client.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
+	authenticator := New(server.URL)
+	platform, err := authenticator.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
 		APIKey:    "key-1",
 		APISecret: "secret-1",
 	})
@@ -55,8 +54,8 @@ func TestAuthenticatePlatformRejectsInvalidResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New(Config{BaseURL: server.URL})
-	_, err := client.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
+	authenticator := New(server.URL)
+	_, err := authenticator.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
 		APIKey:    "key-1",
 		APISecret: "wrong-secret",
 	})
@@ -71,12 +70,48 @@ func TestAuthenticatePlatformRejectsUnauthorizedStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := New(Config{BaseURL: server.URL})
-	_, err := client.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
+	authenticator := New(server.URL)
+	_, err := authenticator.AuthenticatePlatform(context.Background(), ws.PlatformCredentials{
 		APIKey:    "key-1",
 		APISecret: "wrong-secret",
 	})
 	if !errors.Is(err, ws.ErrUnauthorized) {
 		t.Fatalf("AuthenticatePlatform error = %v, want ErrUnauthorized", err)
+	}
+}
+
+func TestActivePlatformIDsReturnsOnlyActivePlatforms(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/internal/platforms/active" {
+			t.Fatalf("path = %s, want /internal/platforms/active", r.URL.Path)
+		}
+
+		_ = json.NewEncoder(w).Encode(activePlatformsResponse{
+			Platforms: []activePlatform{
+				{ID: 101, IsActive: true},
+				{ID: "platform-202", IsActive: true},
+				{ID: 303, IsActive: false},
+			},
+		})
+	}))
+	defer server.Close()
+
+	authenticator := New(server.URL)
+	platformIDs, err := authenticator.ActivePlatformIDs(context.Background())
+	if err != nil {
+		t.Fatalf("ActivePlatformIDs returned %v", err)
+	}
+
+	if _, ok := platformIDs["101"]; !ok {
+		t.Fatalf("expected numeric platform ID to be present")
+	}
+	if _, ok := platformIDs["platform-202"]; !ok {
+		t.Fatalf("expected string platform ID to be present")
+	}
+	if _, ok := platformIDs["303"]; ok {
+		t.Fatalf("expected inactive platform ID to be excluded")
 	}
 }

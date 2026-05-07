@@ -25,6 +25,7 @@ type Hub struct {
 	register       chan *Client
 	unregister     chan *Client
 	subscribe      chan SubscriptionRequest
+	syncActive     chan map[string]struct{}
 	clientMessages chan ClientMessage
 	priceUpdates   chan PriceUpdatePayload
 	orderUpdates   chan orderUpdatePublication
@@ -44,6 +45,7 @@ func NewHub() *Hub {
 		register:                make(chan *Client),
 		unregister:              make(chan *Client),
 		subscribe:               make(chan SubscriptionRequest),
+		syncActive:              make(chan map[string]struct{}),
 		clientMessages:          make(chan ClientMessage),
 		priceUpdates:            make(chan PriceUpdatePayload),
 		orderUpdates:            make(chan orderUpdatePublication),
@@ -68,6 +70,8 @@ func (h *Hub) Run() {
 			h.unregisterClient(client)
 		case req := <-h.subscribe:
 			h.applySubscription(req)
+		case activePlatformIDs := <-h.syncActive:
+			h.disconnectInactivePlatforms(activePlatformIDs)
 		case message := <-h.clientMessages:
 			if h.clients[message.Client] {
 				h.enqueue(message.Client, message.Envelope)
@@ -108,6 +112,10 @@ func (h *Hub) Unregister(client *Client) {
 
 func (h *Hub) Subscribe(req SubscriptionRequest) {
 	h.subscribe <- req
+}
+
+func (h *Hub) SyncActivePlatforms(activePlatformIDs map[string]struct{}) {
+	h.syncActive <- activePlatformIDs
 }
 
 func (h *Hub) Send(client *Client, envelope Envelope) {
@@ -212,5 +220,14 @@ func (h *Hub) removeClientSubscriptions(client *Client) {
 
 	if client.subscriptions.MarketEvents {
 		delete(h.marketEventsSubscribers, client)
+	}
+}
+
+func (h *Hub) disconnectInactivePlatforms(activePlatformIDs map[string]struct{}) {
+	for client := range h.clients {
+		if _, ok := activePlatformIDs[client.platformID]; ok {
+			continue
+		}
+		h.unregisterClient(client)
 	}
 }

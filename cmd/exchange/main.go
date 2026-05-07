@@ -10,13 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	auth "stock-exchange-ws/internal"
 	"stock-exchange-ws/internal/kafkaconsumer"
-	"stock-exchange-ws/internal/platformauth"
 	"stock-exchange-ws/internal/services"
 	"stock-exchange-ws/internal/ws"
 
 	"github.com/gorilla/websocket"
 )
+
+const activePlatformsPollInterval = 3 * time.Second
 
 // Market time provider
 type MarketTimeProvider struct{}
@@ -52,6 +54,26 @@ func platformAPIURL() string {
 	return env
 }
 
+func syncActivePlatforms(ctx context.Context, authenticator *auth.Authenticator, hub *ws.Hub) {
+	ticker := time.NewTicker(activePlatformsPollInterval)
+	defer ticker.Stop()
+
+	for {
+		activePlatformIDs, err := authenticator.ActivePlatformIDs(ctx)
+		if err != nil {
+			log.Printf("active platforms sync failed: %v", err)
+		} else {
+			hub.SyncActivePlatforms(activePlatformIDs)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,10 +92,9 @@ func main() {
 
 	// Initialize services
 	orderService := &OrderService{}
-	authenticator := platformauth.New(platformauth.Config{
-		BaseURL: platformAPIURL(),
-	})
+	authenticator := auth.New(platformAPIURL())
 	marketTimeProvider := &MarketTimeProvider{}
+	go syncActivePlatforms(ctx, authenticator, hub)
 
 	// Create WebSocket handler
 	handler := ws.NewHandler(ws.HandlerConfig{

@@ -146,3 +146,32 @@ func assertNoEnvelope(t *testing.T, ch <-chan Envelope) {
 	case <-time.After(50 * time.Millisecond):
 	}
 }
+
+func TestSyncActivePlatformsRemovesInactiveClients(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+
+	active := newClient(hub, nil, "platform-a", nil, 1)
+	inactive := newClient(hub, nil, "platform-b", nil, 1)
+
+	hub.Register(active)
+	hub.Register(inactive)
+	hub.Subscribe(SubscriptionRequest{Client: active, Channel: ChannelOrderUpdates})
+	hub.Subscribe(SubscriptionRequest{Client: inactive, Channel: ChannelOrderUpdates})
+
+	hub.SyncActivePlatforms(map[string]struct{}{
+		"platform-a": {},
+	})
+
+	time.Sleep(50 * time.Millisecond)
+
+	if !hub.clients[active] {
+		t.Fatalf("active client should still be registered")
+	}
+	if hub.clients[inactive] {
+		t.Fatalf("inactive client should have been removed")
+	}
+	if _, ok := <-inactive.send; ok {
+		t.Fatalf("inactive client send channel should be closed")
+	}
+}
